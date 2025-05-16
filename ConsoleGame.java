@@ -1,4 +1,4 @@
-public class Game {
+public class ConsoleGame {
     
     // variables for your game go here
     // YOUR CODE HERE
@@ -9,7 +9,7 @@ public class Game {
     private boolean gameOver;
     // Example Code end
 
-    public Game(){
+    public ConsoleGame(){
         // initialize your game here
         // YOUR CODE HERE
 
@@ -23,7 +23,7 @@ public class Game {
     /**
      * Default: executes 60 times a second.
      * Is immediately followed by a render()
-     * To change frequency of updates, change UPDATES_PER_SECOND in GameManager.java
+     * To change update frequency, change UPDATES_PER_SECOND in GameManager.java
      * */
     public void onUpdate() {
         /* NOTE: to end the game, call GameManager.shutdown() */
@@ -34,7 +34,7 @@ public class Game {
             timer++;
 
             if(timer >= 100 || numWPresses >= 10) {
-                GameManager.shutdown();
+                ConsoleGameManager.shutdown();
                 gameOver = true;
             }
         }
@@ -62,20 +62,20 @@ public class Game {
      * Render output to the console.
      * Runs after each onStep,  after each onKeyPress, and once after GameManager.shutdown()
      * It is recommended to begin each render by clearing the screen using GameManager.clearScreen()
-     * Instead of System.out.println, please use GameManager.println().
-     * It is recommended that this function has no game logic, and does not have any side effects.  
+     * Instead of System.out.println, please use GameManager.println(). See GameManager.println() for reasoning.
+     * It is recommended that this function contain no game logic, and does not have any side effects.  
      */
     public void render(){
-        GameManager.clearScreen();
+        ConsoleGameManager.clearScreen();
 
         // Example code
         {
-            GameManager.println("\rWs: " + numWPresses);
-            GameManager.println("\rTime: " + timer);
+            ConsoleGameManager.println("\rWs: " + numWPresses);
+            ConsoleGameManager.println("\rTime: " + timer);
 
             if(gameOver) {
-                GameManager.println("game over");
-                GameManager.println("score: " + (numWPresses+timer));
+                ConsoleGameManager.println("game over");
+                ConsoleGameManager.println("score: " + (numWPresses+timer));
             }
         }
 

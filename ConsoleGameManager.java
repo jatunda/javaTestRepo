@@ -5,11 +5,11 @@ import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.TimeUnit;
 
-public class GameManager {
+public class ConsoleGameManager {
     
-    private static final int UPDATES_PER_SECOND = 1;
+    private static final int UPDATES_PER_SECOND = 60;
 
-    private static Game myGame;
+    private static ConsoleGame myGame;
     private static boolean shouldShutDown = false;
 
     public static void main(String[] args) throws IOException, InterruptedException {
@@ -20,7 +20,7 @@ public class GameManager {
 		Runtime.getRuntime().exec(cmd).waitFor(); // throws IOException, InterruptedException
 
         // initialize game
-        myGame = new Game();
+        myGame = new ConsoleGame();
 
         // init onUpdate thread
         ScheduledExecutorService updateExecutor = Executors.newSingleThreadScheduledExecutor();
@@ -51,7 +51,7 @@ public class GameManager {
                     }
                 } catch(Exception e) {
                     shutdown();
-                    GameManager.println("IO Exception!");
+                    ConsoleGameManager.println("IO Exception!");
                 }
             }
         };

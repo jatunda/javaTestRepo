@@ -1,7 +1,7 @@
 import javax.swing.*;
 import java.awt.*;
 
-public class Runner {
+public class SwingGame {
     public static void main(String[] args) {
         // create the frame
         JFrame frame = new JFrame("Test frame name");
