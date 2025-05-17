@@ -41,18 +41,21 @@ public class TerminalGame {
 
     private char[][] grid;
     private final String BORDER_CHAR = "⬜";
-    private final String EMPTY_CHAR = "⬛";
+    private final String EMPTY_CHAR = "  ";//"⬛";
     private int cursorRow = 0;
     private int cursorCol = 0;
     private char blockType = 'O'; // I,O,T,S,Z,J,L
     private int cursorRotation = 0; // will be incremented/decremented based on blockType
-    private int gravityTimer = 0;
-    private int ticksPerGravity = 120;
+
+    private long timeOfLastGravity=0; 
+    private int totalLinesCleared = 0;
+
     private int score = 0;
     private char mostRecentKeypress;
     private String debugOutput = "";
     private ArrayList<Character> nextPieces = new ArrayList<Character>(7);
 
+    private boolean gameOver = false; 
 
     public TerminalGame(){
 
@@ -63,9 +66,10 @@ public class TerminalGame {
             }
         }
 
+        timeOfLastGravity = System.nanoTime();
         spawnNewPiece();
-
     }
+
 
     private void spawnNewPiece() {
 
@@ -81,16 +85,34 @@ public class TerminalGame {
             Collections.shuffle(nextPieces);
         }
         blockType = nextPieces.removeFirst();
+        if(nextPieces.isEmpty()) {
+            nextPieces.add('T');
+            nextPieces.add('O');
+            nextPieces.add('I');
+            nextPieces.add('J');
+            nextPieces.add('L');
+            nextPieces.add('S');
+            nextPieces.add('Z');
+            Collections.shuffle(nextPieces);
+        }
 
         // set cursor location 
         cursorRow = 1;
         cursorCol = 4;
-        if(blockType == 'I' || blockType == 'O'){
+        if(blockType == 'I'){
             cursorRow--;
         } 
 
         // set rotation 
         cursorRotation = 0;
+
+        // dying
+        for(Location loc: getActiveTetromino()) {
+            if(grid[loc.row][loc.col] != '-') {
+                gameOver = true;
+                TerminalGameManager.shutdown();
+            }
+        }
 
         // put into grid
         for(Location loc : getActiveTetromino()) {
@@ -98,63 +120,88 @@ public class TerminalGame {
         }
     }
 
-    private List<Location> getActiveTetromino() { // gets them in default mode
+    private static double getTimePerGravity(int level) {
+        return Math.pow(0.8 - ((level-1)*0.007), level-1);
+    }
+
+    private List<Location> generateTetromino(Location pivot, char blockType, int rotation) {
         List<Location> output = new ArrayList<>(4);
         if(blockType == 'I')
         {
             for(int i = -1; i <= 2; i++) { // default horizontal mode
-                output.add(new Location(cursorRow, cursorCol+i));
+                output.add(new Location(pivot.row, pivot.col+i));
             } 
         }
         else if (blockType == 'O') 
         {
-            output.add(new Location(cursorRow,cursorCol));
-            output.add(new Location(cursorRow+1,cursorCol));
-            output.add(new Location(cursorRow,cursorCol+1));
-            output.add(new Location(cursorRow+1,cursorCol+1));
+            output.add(new Location(pivot.row,pivot.col));
+            output.add(new Location(pivot.row-1,pivot.col));
+            output.add(new Location(pivot.row,pivot.col+1));
+            output.add(new Location(pivot.row-1,pivot.col+1));
         }
         else if (blockType == 'T') 
         {
-            output.add(new Location(cursorRow,cursorCol));
-            output.add(new Location(cursorRow,cursorCol+1));
-            output.add(new Location(cursorRow,cursorCol-1));
-            output.add(new Location(cursorRow-1,cursorCol));
+            output.add(new Location(pivot.row,pivot.col));
+            output.add(new Location(pivot.row,pivot.col+1));
+            output.add(new Location(pivot.row,pivot.col-1));
+            output.add(new Location(pivot.row-1,pivot.col));
         }
         else if (blockType == 'J') 
         {
-            output.add(new Location(cursorRow,cursorCol));
-            output.add(new Location(cursorRow,cursorCol+1));
-            output.add(new Location(cursorRow,cursorCol-1));
-            output.add(new Location(cursorRow-1,cursorCol-1));
+            output.add(new Location(pivot.row,pivot.col));
+            output.add(new Location(pivot.row,pivot.col+1));
+            output.add(new Location(pivot.row,pivot.col-1));
+            output.add(new Location(pivot.row-1,pivot.col-1));
         }
         else if (blockType == 'L') 
         {
-            output.add(new Location(cursorRow,cursorCol));
-            output.add(new Location(cursorRow,cursorCol+1));
-            output.add(new Location(cursorRow,cursorCol-1));
-            output.add(new Location(cursorRow-1,cursorCol+1));
+            output.add(new Location(pivot.row,pivot.col));
+            output.add(new Location(pivot.row,pivot.col+1));
+            output.add(new Location(pivot.row,pivot.col-1));
+            output.add(new Location(pivot.row-1,pivot.col+1));
         }
         else if (blockType == 'Z') 
         {
-            output.add(new Location(cursorRow,cursorCol));
-            output.add(new Location(cursorRow,cursorCol+1));
-            output.add(new Location(cursorRow-1,cursorCol));
-            output.add(new Location(cursorRow-1,cursorCol-1));
+            output.add(new Location(pivot.row,pivot.col));
+            output.add(new Location(pivot.row,pivot.col+1));
+            output.add(new Location(pivot.row-1,pivot.col));
+            output.add(new Location(pivot.row-1,pivot.col-1));
         }
         else if (blockType == 'S') 
         {
-            output.add(new Location(cursorRow,cursorCol));
-            output.add(new Location(cursorRow,cursorCol-1));
-            output.add(new Location(cursorRow-1,cursorCol));
-            output.add(new Location(cursorRow-1,cursorCol+1));
+            output.add(new Location(pivot.row,pivot.col));
+            output.add(new Location(pivot.row,pivot.col-1));
+            output.add(new Location(pivot.row-1,pivot.col));
+            output.add(new Location(pivot.row-1,pivot.col+1));
         }
 
-        Location pivot = new Location(cursorRow, cursorCol);
-        for(int i = 0; i < cursorRotation; i++) {
+        for(int i = 0; i < rotation; i++) {
             output = rotateTetromino(output, pivot , RotationDirection.CLOCKWISE, blockType=='I');
         }
 
         return output;
+    }
+
+    private List<Location> getActiveTetromino() { // gets them in default mode
+        return generateTetromino(new Location(cursorRow, cursorCol), blockType, cursorRotation);
+    }
+
+    public int getLevel() {
+        return totalLinesCleared/10;
+    }
+
+    private List<Location> translateTetromino(List<Location> tetromino, Direction direction, int distance) {
+        List<Location> newTetromino = new ArrayList<Location>(4);
+        for(Location loc : tetromino) {
+            int newCol = loc.col;
+            int newRow = loc.row;
+            if(direction == Direction.UP) { newRow-=distance; }
+            if(direction == Direction.DOWN) { newRow+=distance; }
+            if(direction == Direction.LEFT) { newCol-=distance; }
+            if(direction == Direction.RIGHT) { newCol+=distance; }
+            newTetromino.add(new Location(newRow, newCol));
+        }
+        return newTetromino;
     }
 
     /**
@@ -165,16 +212,7 @@ public class TerminalGame {
     private boolean tryMove(List<Location> tetromino, Direction direction) {
         
         // generate potential new tetromino
-        List<Location> newTetromino = new ArrayList<Location>(4);
-        for(Location loc : tetromino) {
-            int newCol = loc.col;
-            int newRow = loc.row;
-            if(direction == Direction.UP) { newRow--; }
-            if(direction == Direction.DOWN) { newRow++; }
-            if(direction == Direction.LEFT) { newCol--; }
-            if(direction == Direction.RIGHT) { newCol++; }
-            newTetromino.add(new Location(newRow, newCol));
-        }
+        List<Location> newTetromino = translateTetromino(tetromino, direction, 1);
 
         if(!isNewTetrominoAllowed(newTetromino))
         {
@@ -182,6 +220,7 @@ public class TerminalGame {
             if(direction == Direction.DOWN) {
                 int linesCleared = clearFullLines();
                 score += (((linesCleared +2)/2) * ((linesCleared+3)/2) - 1) * 100;
+                totalLinesCleared += linesCleared;
                 spawnNewPiece();
             }
             return false;
@@ -262,7 +301,6 @@ public class TerminalGame {
             // else if piece cannot move (aka space occupied or out of bounds)
             else if ( !locationInBounds(newLoc) || grid[newLoc.row][newLoc.col] != '-' )
             {
-                debugOutput += newLoc;
                 return false;
             }
         }
@@ -286,7 +324,6 @@ public class TerminalGame {
         
         // check each spot as valid
         if(!isNewTetrominoAllowed(newTetromino)) {
-            debugOutput += "failed rotate!";
             return false;
         }
         
@@ -303,7 +340,6 @@ public class TerminalGame {
         }
         cursorRotation += 4; // prevent negative mod values
         cursorRotation %= 4;
-        debugOutput += "rotate success!";
         
         return true;
     }
@@ -349,14 +385,25 @@ public class TerminalGame {
     public void onUpdate() {
         /* NOTE: to end the game, call GameManager.shutdown() */
         
-        gravityTimer++;
-
-        if(gravityTimer > ticksPerGravity) {
-            gravityTimer = 0;
-            //cursorY++;
+        // gravity stuff
+        long currTime = System.nanoTime();
+        long timePerGravity = (long)(getTimePerGravity(getLevel()) * 1000000000);
+        while(timeOfLastGravity + timePerGravity < currTime) {
+            boolean moved = tryMove(getActiveTetromino(), Direction.DOWN);
+            if(!moved) {
+                // tried to move down but got blocked
+                // this means we spawned a new piece
+                timeOfLastGravity = currTime;
+                break; 
+            } else {
+                // moved
+                timeOfLastGravity += timePerGravity;
+            }
         }
 
     }
+
+
 
 
     /**
@@ -388,6 +435,7 @@ public class TerminalGame {
             case 's': // down
             case 'B':
                 tryMove(getActiveTetromino(), Direction.DOWN);
+                score+=1;
                 break;
 
             case 'd': // right
@@ -404,7 +452,9 @@ public class TerminalGame {
                 break;
 
             case ' ': // spacebar is the DROP
-                while(tryMove(getActiveTetromino(), Direction.DOWN)) {}
+                while(tryMove(getActiveTetromino(), Direction.DOWN)) {
+                    score+=2;
+                }
                 break;
             case 'q':
                 for(int i = 0; i < grid.length; i++) {
@@ -421,6 +471,18 @@ public class TerminalGame {
 
     }
 
+    private boolean isGhostLocation(Location location) {
+        List<Location> activeTetromino = getActiveTetromino();
+        for(int i = 20; i > 0; i--) {
+            List<Location> translatedTeromino = translateTetromino(activeTetromino, Direction.DOWN, i);
+            if(isNewTetrominoAllowed(translatedTeromino)) {
+                return translatedTeromino.contains(location);
+            }
+        }
+        // should never reach here
+        return getActiveTetromino().contains(location);
+    }
+
 
     /**
      * Render output to the console.
@@ -429,58 +491,81 @@ public class TerminalGame {
      * It is recommended that this function contain no game logic, and does not have any side effects.  
      */
     public void render(){
+        // rendering NEXT 
+        System.out.println("       +--NEXT--+");
+        List<Location> nextTetromino = generateTetromino(new Location(1,5), nextPieces.get(0), 0);
+        for(int r = 0; r < 2; r++) {
+            for(int c = 0; c < 10; c++){
+                if(nextTetromino.contains(new Location(r,c))) {
+                    System.out.print(blockTypeToEmoji(nextPieces.get(0)));
+                } else {
+                    System.out.print(blockTypeToEmoji('-'));
+                }
+            }
+            System.out.println();
+        }
+
         String borderRow = "";
         for(int c = -1; c < grid[0].length + 1; c++) {
             borderRow += BORDER_CHAR;
         }
         System.out.println(borderRow);
-        for(char[] row : grid) {
+        for(int r = 0; r < grid.length; r++) {
+            char[] row = grid[r];
             String outputRow = BORDER_CHAR;
-            for(char square : row) {
-                switch (square) {
-                    case 'Z':
-                        outputRow += "🟥"; // Z
-                        break;
-                    case 'L':
-                        outputRow += "🟧"; // L
-                        break;
-                    case 'O':
-                        outputRow += "🟨"; // O
-                        break;
-                    case 'S':
-                        outputRow += "🟩"; // S
-                        break;
-                    case 'J':
-                        outputRow += "🟦"; // J
-                        break;
-                    case 'T':
-                        outputRow += "🟪"; // T
-                        break;
-                    case 'I':
-                        outputRow += "🧊"; // I
-                        break;
-                    default:
-                        outputRow += EMPTY_CHAR;
-                        break;
+            for(int c = 0; c < row.length; c++) {
+
+                char blockType = row[c];
+
+                Location currLocation = new Location(r,c);
+                if(!getActiveTetromino().contains(currLocation)) {
+                    if(isGhostLocation(currLocation))
+                    {
+                        blockType = 'G'; // override with ghost
+                    }
                 }
+
+                outputRow += blockTypeToEmoji(blockType);
             }
             outputRow += BORDER_CHAR;
             System.out.println(outputRow);
         }
         System.out.println(borderRow);
 
-        System.out.println("Score:" + score);
+        System.out.println("Lines cleared: " + totalLinesCleared);
+        System.out.println("Level: " + getLevel());
+        System.out.println("Score: " + score);
         System.out.println("most recent key: " + mostRecentKeypress);
-        System.out.println(debugOutput);
+        if(gameOver) {System.out.println("Game Over!");}
+        System.out.println("debug:" + debugOutput);
         debugOutput = "";
     }
 
-    // TODO: Dying
-    // TODO: gravity
-    // TODO: Gravity speed increase over time
-    // TODO: more shapes in default rotation
-    // TODO: choosing which shape when spawning (grab bag)
-    // TODO: rotation
-    // TODO: rotation wallkicks/floorkicks
+    private String blockTypeToEmoji(char blockType){
+        switch (blockType) {
+            case 'Z':
+                return "🟥"; // Z
+            case 'L':
+                return "🟧"; // L
+            case 'O':
+                return "🟨"; // O
+            case 'S':
+                return "🟩"; // S
+            case 'J':
+                return "🟦"; // J
+            case 'T':
+                return "🟪"; // T
+            case 'I':
+                return "🧊"; // I
+            case 'G':
+                return "⬛"; // Ghost
+            default:
+                return EMPTY_CHAR;
+        }
+    }
+
+    // TODO: lock delay - 0.5s before level 20... idk after 
     // TODO: ghost for where tetromino would land after a drop
+    // TODO: rotation wallkicks/floorkicks
+    // TODO: hold
 }

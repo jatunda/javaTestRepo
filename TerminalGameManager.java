@@ -115,6 +115,9 @@ public class TerminalGameManager {
     private static void render() {
         if(myGame == null) return;
 
+        // REAL clear screen
+        //System.out.print(" ".repeat(200*10));
+
         // redirect System.out, and capture myGame.render() 
         PrintStream originalOut = System.out; // Save original System.out
         ByteArrayOutputStream baos = new ByteArrayOutputStream();
